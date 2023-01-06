@@ -7,6 +7,10 @@ def l2(img, ref_img):
 def l1(img, ref_img):
     return dr.mean(dr.abs(img - ref_img))
 
+def bce(pred, gt):
+    pred = dr.clip(pred, 1e-7, 1 - 1e-7)
+    return -dr.mean( gt * dr.log(pred) + (1 - gt) * dr.log(1 - pred) )
+
 def mape(img, ref_img):
     rel_error = dr.abs(img - ref_img) / dr.abs(1e-2 + dr.mean(ref_img, axis=-1))
     return dr.mean(rel_error)
