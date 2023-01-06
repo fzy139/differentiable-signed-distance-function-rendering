@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=$1 python -u python/optimize.py $2 --optconfig $3
