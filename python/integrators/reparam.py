@@ -94,7 +94,7 @@ class ReparamIntegrator(mi.SamplingIntegrator):
         ray, ray_weight = sensor.sample_ray_differential(time, wavelength_sample, adjusted_position, aperture_sample)
         ray.scale_differential(diff_scale_factor)
         rgb, valid_ray, det, aovs_ = self.sample(mode, scene, sampler, ray,
-                                                 None, None, None, active)
+                                                 None, None, _aovs, active)
 
         # Re-evaluate sample's sensor position and sensor importance
         it = dr.zeros(mi.Interaction3f)
@@ -112,6 +112,7 @@ class ReparamIntegrator(mi.SamplingIntegrator):
         aovs[2] = rgb.z
         if has_alpha_channel:
             aovs.append(dr.select(valid_ray, mi.Float(1.0), mi.Float(0.0)))
+            print(dr.sum(dr.select(valid_ray, mi.Float(1.0), mi.Float(0.0))))
         aovs.append(dr.replace_grad(mi.Float(1.0), det * ray_weight[0]))
 
         aovs = aovs + aovs_
@@ -157,7 +158,7 @@ class ReparamIntegrator(mi.SamplingIntegrator):
 
         # Sample film positions and subsequently accumulate actual light paths
         block = sensor.film().create_block()
-        _aovs = [None] * len(self.aov_names())
+        _aovs = self.aov_names() # [None] * len(self.aov_names())
         diff_scale_factor = dr.rsqrt(mi.ScalarFloat(spp))
 
         # If we ask for AOVs, reparameterize also in forward pass to get values
@@ -264,7 +265,7 @@ class ReparamIntegrator(mi.SamplingIntegrator):
         if self.use_aovs:
             return ['sdf_value', 'warp_t', 'vx', 'vy', 'div', 'i', 'weight_sum', 'weight', 'warp_t_dx', 'warp_t_dy', 'warp_t_dz']
         else:
-            return []
+            return ['mask']
 
     def traverse(self, cb):
         if self.sdf is not None:

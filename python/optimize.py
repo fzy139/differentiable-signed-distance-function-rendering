@@ -4,7 +4,7 @@ import argparse, os, sys
 from os.path import join
 
 import mitsuba as mi
-
+import drjit as dr
 from constants import OUTPUT_DIR, RENDER_DIR, SCENE_DIR
 
 
@@ -27,17 +27,28 @@ def render_reference_images(scene_config, config, ref_spp=1024, force=False, ver
         else:
             img = mi.render(ref_scene, sensor=sensor, seed=sensor_idx + 41, spp=ref_spp)
             mi.util.write_bitmap(fn, img[..., :3], write_async=False)
+            mi.util.write_bitmap(join(render_folder, f'ref-mask-{sensor_idx:02d}.exr'), img[...,-1:], write_async=False)
+
+            
 
 def copy_reference_images_to_output_dir(scene_config, config, output_dir):
     """Copies the reference images to the output directory and returns a list of them"""
     from shutil import copyfile
     ref_image_paths = []
+    ref_mask_paths = []
+
     render_folder = join(RENDER_DIR, scene_config.scene, scene_config.name, config.integrator, 'ref')
     for idx in range(len(scene_config.sensors)):
         ref_name = join(output_dir, f'ref-{idx:02d}.exr')
         copyfile(join(render_folder, f'ref-{idx:02d}.exr'), ref_name)
+
+        mask_name = join(output_dir, f'ref-mask-{idx:02d}.exr')
+        copyfile(join(render_folder, f'ref-mask-{idx:02d}.exr'), mask_name)
+
         ref_image_paths.append(ref_name)
-    return ref_image_paths
+        ref_mask_paths.append(mask_name)
+
+    return ref_image_paths, ref_mask_paths
 
 
 def optimize(scene_name, config, opt_name, output_dir, ref_spp=1024,
@@ -54,10 +65,10 @@ def optimize(scene_name, config, opt_name, output_dir, ref_spp=1024,
     # Pass scene name as part of the opt. config
     opt_config.scene = scene_name
     render_reference_images(opt_config, config, ref_spp=ref_spp, force=force, verbose=verbose, mts_args=mts_args)
-    ref_image_paths = copy_reference_images_to_output_dir(opt_config, config, current_output_dir)
+    ref_image_paths, ref_mask_paths = copy_reference_images_to_output_dir(opt_config, config, current_output_dir)
 
     # 2. Optimize SDF compared to ref image(s)
-    optimize_shape(opt_config, mts_args, ref_image_paths, current_output_dir, config)
+    optimize_shape(opt_config, mts_args, ref_image_paths, ref_mask_paths, current_output_dir, config)
 
 
 def main(args):

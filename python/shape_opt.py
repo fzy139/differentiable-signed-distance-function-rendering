@@ -12,6 +12,7 @@ from constants import SCENE_DIR
 from create_video import create_video
 from util import dump_metadata, render_turntable, resize_img, set_sensor_res
 
+from losses import bce
 
 def load_ref_images(paths, multiscale=False):
     """Load the reference images and compute scale pyramid for multiscale loss"""
@@ -29,7 +30,7 @@ def load_ref_images(paths, multiscale=False):
     return result
 
 
-def optimize_shape(scene_config, mts_args, ref_image_paths,
+def optimize_shape(scene_config, mts_args, ref_image_paths, ref_mask_paths,
                    output_dir, config, write_ldr_images=True):
     """Main function that runs the actual SDF shape reconstruction"""
 
@@ -39,7 +40,7 @@ def optimize_shape(scene_config, mts_args, ref_image_paths,
     scene_name = scene_config.scene
     ref_scene_name = join(SCENE_DIR, scene_name, f'{scene_name}.xml')
     ref_images = load_ref_images(ref_image_paths, True)
-
+    mask_images = load_ref_images(ref_mask_paths, True)
     # Load scene, currently handle SDF shape separately from Mitsuba scene
     sdf_scene = mi.load_file(ref_scene_name, shape_file='dummysdf.xml', sdf_filename=join(SCENE_DIR, 'sdfs', 'bunny_64.vol'),
                              integrator=config.integrator, resx=scene_config.resx, resy=scene_config.resy, **mts_args)
@@ -61,6 +62,7 @@ def optimize_shape(scene_config, mts_args, ref_image_paths,
             img = mi.render(sdf_scene, sensor=sensor, seed=idx,
                             spp=config.spp * config.primal_spp_mult)
         mi.util.write_bitmap(join(output_dir, f'init-{idx:02d}.exr'), img[..., :3])
+        mi.util.write_bitmap(join(output_dir, f'init-mask-{idx:02d}.exr'), img[..., -1])
 
     # Set initial rendering resolution
     for sensor in scene_config.sensors:
@@ -78,12 +80,23 @@ def optimize_shape(scene_config, mts_args, ref_image_paths,
                 img = mi.render(sdf_scene, params=params, sensor=sensor,
                                 seed=seed, spp=config.spp * config.primal_spp_mult,
                                 seed_grad=seed + 1 + len(scene_config.sensors), spp_grad=config.spp)
+                mask = img[...,-1]
+                img = img[...,:3]
+                
                 seed += 1 + len(scene_config.sensors)
                 view_loss = scene_config.loss(img, ref_images[idx][sensor.film().crop_size()[0]]) / scene_config.batch_size
                 dr.backward(view_loss)
                 bmp = resize_img(mi.Bitmap(img), scene_config.target_res)
                 mi.util.write_bitmap(join(opt_image_dir, f'opt-{i:04d}-{idx:02d}' + ('.png' if write_ldr_images else '.exr')), bmp)
                 loss += view_loss
+                gt_mask =  mask_images[idx][sensor.film().crop_size()[0]]
+                mask_loss = bce(mask,gt_mask) / scene_config.batch_size
+                dr.backward(mask_loss)
+                mask_bmp = resize_img(mi.Bitmap(mask), scene_config.target_res)
+                gt_bmp = resize_img(mi.Bitmap(gt_mask), scene_config.target_res)
+                mi.util.write_bitmap(join(opt_image_dir, f'opt-mask-{i:04d}-{idx:02d}' + ('.exr' if write_ldr_images else '.exr')), mask_bmp)
+                mi.util.write_bitmap(join(opt_image_dir, f'opt-mask-{i:04d}-{idx:02d}-gt' + ('.exr' if write_ldr_images else '.exr')), gt_bmp)
+                loss += mask_loss
 
             # Evaluate regularization loss
             reg_loss = scene_config.eval_regularizer(opt, sdf_object, i)
@@ -93,9 +106,9 @@ def optimize_shape(scene_config, mts_args, ref_image_paths,
 
             scene_config.save_params(opt, output_dir, i, force=i == n_iter - 1)
             scene_config.validate_gradients(opt, i)
-            loss_str = f'Loss: {loss[0]:.4f}'
+            loss_str = f'Loss: {loss[0]:.4f}  (mask: {mask_loss[0]:.4f} )'
             if dr.grad_enabled(reg_loss):
-                loss_str += f' (reg (avg. x 1e4): {1e4*reg_loss[0] / dr.prod(sdf_object.shape):.4f})'
+                loss_str += f' (reg (avg. x 1e4): {1e8*reg_loss[0] / dr.prod(sdf_object.shape):.4f})'
 
             pbar.set_description(loss_str)
             loss_values.append(loss[0])

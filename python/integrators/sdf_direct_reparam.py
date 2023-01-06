@@ -8,7 +8,7 @@ from .reparam import ReparamIntegrator
 class SdfDirectReparamIntegrator(ReparamIntegrator):
     def __init__(self, props=mi.Properties()):
         super().__init__(props)
-        self.use_aovs = props.get('use_aovs', False)
+        self.use_aovs = props.get('use_aovs', True)
         self.hide_emitters = props.get('hide_emitters', False)
         self.detach_indirect_si = props.get('detach_indirect_si', False)
         self.decouple_reparam = props.get('decouple_reparam', False)
@@ -21,6 +21,8 @@ class SdfDirectReparamIntegrator(ReparamIntegrator):
         reparametrize = True and mode != dr.ADMode.Primal
         reparam_primary_ray = True and reparametrize
         si, si_d0, det, extra_output = self.ray_intersect(scene, sampler, ray, depth=0, reparam=reparam_primary_ray)
+        # occluded, det_e, extra_output_ = self.ray_test(scene, sampler, ray, depth=0, reparam=reparametrize)
+        mask = dr.select(dr.isfinite(si.t), 1, 0)
         valid_ray = (not self.hide_emitters) and scene.environment() is not None
         valid_ray |= si.is_valid()
 
@@ -108,6 +110,7 @@ class SdfDirectReparamIntegrator(ReparamIntegrator):
 
         aovs = [extra_output[k] if (extra_output is not None) and (k in extra_output)
                 else mi.Float(0.0) for k in self.aov_names()]
+        aovs = [mask]
         return dr.select(valid_ray, mi.Spectrum(result), 0.0), valid_ray, primary_det, aovs
 
 
