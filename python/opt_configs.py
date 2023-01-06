@@ -308,6 +308,10 @@ CONFIG_DICTS = [
         'upsample_iter': [128, 180, 220],
         'sdf_res': 128,
         'resx': 256, 'resy': 256,
+    },{
+        'name': 'diffuse-12-hq-l',
+        'parent': 'diffuse-12-hq',
+        'resx': 512, 'resy': 512,
     }, {
         'name': 'diffuse-12-hqq',
         'parent': 'diffuse-12',
@@ -316,6 +320,10 @@ CONFIG_DICTS = [
         'upsample_iter': [128, 180, 220, 270],
         'sdf_res': 256,
         'resx': 512, 'resy': 512,
+    }, {
+        'name': 'diffuse-12-hqqq',
+        'parent': 'diffuse-12-hqq',
+        'sdf_res': 512,
     }, {
         'name': 'diffuse-16-hq',
         'parent': 'diffuse-12-hq',
@@ -341,6 +349,10 @@ CONFIG_DICTS = [
         'name': 'diffuse-40-hq',
         'parent': 'diffuse-12-hq',
         'sensors': (get_regular_cameras, 40),
+    },{
+        'name': 'diffuse-50-hq-l',
+        'parent': 'diffuse-12-hq-l',
+        'sensors': (get_regular_cameras, 50),
     }, {
         'name': 'diffuse-64-hq',
         'parent': 'diffuse-12-hq',
@@ -365,7 +377,15 @@ CONFIG_DICTS = [
         'name': 'diffuse-40-hqq',
         'parent': 'diffuse-12-hqq',
         'sensors': (get_regular_cameras, 40),
+    },{
+        'name': 'diffuse-50-hqq',
+        'parent': 'diffuse-12-hqq',
+        'sensors': (get_regular_cameras, 50),
     }, {
+        'name': 'diffuse-40-hqqq',
+        'parent': 'diffuse-12-hqqq',
+        'sensors': (get_regular_cameras, 40),
+    },{
         'name': 'diffuse-48-hqq',
         'parent': 'diffuse-12-hqq',
         'sensors': (get_regular_cameras, 48),
