@@ -2,17 +2,29 @@ import drjit as dr
 import mitsuba as mi
 
 def l2(img, ref_img):
-    return dr.mean(dr.sqr(img - ref_img))
+    return dr.mean(dr.sqrt(dr.sqr(img - ref_img)))
 
 def l1(img, ref_img):
     return dr.mean(dr.abs(img - ref_img))
 
+def sl1(img, ref_img, t=0.01):
+    x = dr.mean(dr.abs(img - ref_img))
+    if dr.all(x < t):
+        x = 1 / (2 * t) * x * x
+    else:
+        x = x - t / 2
+    return x
+
+def bce(pred, gt):
+    pred = dr.clip(pred, 1e-7, 1 - 1e-7)
+    return -dr.mean( gt * dr.log(pred) + (1 - gt) * dr.log(1 - pred) )
+
 def mape(img, ref_img):
-    rel_error = dr.abs(img - ref_img) / dr.abs(1e-2 + dr.mean(ref_img, axis=-1))
+    rel_error = dr.abs(img - ref_img) / dr.abs(1e-2 + dr.mean(ref_img))
     return dr.mean(rel_error)
 
 def downsample(img):
-    n_channels = img.shape[2]
+    n_channels = img.shape[2] if len(img.shape) > 2 else 1
     def linear(x, y):
         x = dr.clamp(x, 0, img.shape[0] - 1)
         y = dr.clamp(y, 0, img.shape[1] - 1)
