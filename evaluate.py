@@ -30,10 +30,7 @@ def read_img(fn, exposure=0, tonemap=True, background_color=None,
     else:
         return np.array(bmp)
 
-def extract_mesh(src_path):
-    loaded_data = np.array(mi.VolumeGrid(src_path))
-    print("Volume Size: ", loaded_data.shape)
-    vertices, triangles = mcubes.marching_cubes(loaded_data, 0.0)
+def get_normalized_mesh(vertices, triangles):
     vertices /= np.amax(np.amax(vertices, axis=0) - np.amin(vertices, axis=0))
     vertices -= 0.5
     Ry90 = np.array([[0., 0., -1.],
@@ -44,6 +41,22 @@ def extract_mesh(src_path):
 
     mesh = trimesh.Trimesh(vertices, triangles)
     trimesh.repair.fix_inversion(mesh)
+    return mesh
+
+def extract_mesh(src_path):
+    loaded_data = np.array(mi.VolumeGrid(src_path))
+
+    flat_vol = loaded_data.reshape(-1)
+    fn = Path(src_path).parent / 'vol.txt'
+    print(fn)
+    with open(fn, "w") as f:
+        for v in flat_vol:
+            f.write(str(v) + "\n")
+
+
+    print("Volume Size: ", loaded_data.shape)
+    vertices, triangles = mcubes.marching_cubes(loaded_data, 0.0)
+    mesh = get_normalized_mesh(vertices, triangles)
     return mesh
    
 def as_mesh(scene_or_mesh):
@@ -83,6 +96,7 @@ if __name__ == '__main__':
         print("mesh exported to ", FLAGS.src_path.replace('vol','obj'))
     else:
         mesh = trimesh.load(FLAGS.src_path)
+        mesh = get_normalized_mesh(mesh.vertices, mesh.faces)
     mesh = as_mesh(mesh)
     ref = as_mesh(trimesh.load(FLAGS.ref_path))
     
